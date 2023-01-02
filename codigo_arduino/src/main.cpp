@@ -10,55 +10,59 @@
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, byte data );
 byte readEEPROM(int deviceaddress, unsigned int eeaddress );
 void nextionCommand(String nextionName, long value);
+void estadoMotor(int motor_state, int pinMotor);
+bool prendidoAlarma(DateTime now, int ArrayHoraAlarma[4], int ArrayMinutosAlarma[4], bool FlagOnce);
+bool apagadoAlarma(DateTime now, int ArrayHoraAlarma[4], int ArrayMinutosAlarma[4], int delayAsincronoHora[4],int delayAsincronoMinuto[4],bool FlagOnce);
 
 
-
-SoftwareSerial SerialNextion(2, 3); // RX, TX
-String  endChar = String(char(0xff)) + String(char(0xff)) + String(char(0xff));
 RTC_DS3231 RTC;
+SoftwareSerial SerialNextion(2, 3); // RX, TX
 
+String  end_char = String(char(0xff)) + String(char(0xff)) + String(char(0xff));
 String dfd;
-byte lastMin=0;
+byte last_min=0;
+byte last_second =0;
 
+int auto_state;
+bool flag_once = true;
+bool flag_auto= true;
 
-unsigned int address_red = 0;
-unsigned int address_green = 1;
-unsigned int address_blue = 2;
-
-
-long red_value;
-long green_value;
-long blue_value;
 int motor_state = 0;
 int motor_state6 = 0;
 
-int alarmNumber = 0;
+int alarm_number = 0;
 
-int ledRojo = 9;
-int ledVerde = 10;
-int ledAzul = 11;
+const byte led_rojo = 9;
+const byte led_verde = 10;
+const byte led_azul = 11;
 
+const int tiempo_prendido_motor = 1;
 
-unsigned long periodo = 2000;
-unsigned long TiempoAhora = 0;
+const int periodo = 2000;
+const int period_100ms = 100;
+unsigned long tiempo_ahora = 0;
 
-int NumeroElementosAlarma =4;
+const int numero_elementos_alarma =4;
 
-unsigned int ArrayAddresHora[] = {6,7,8,9};
-unsigned int ArrayAddresMinuto[] = {12,13,14,15};
+const  int array_address_hora[] = {6,7,8,9};
+const  int array_addres_minuto[] = {12,13,14,15};
 
-int ArrayHoraAlarma[4];
-int ArrayMinutosAlarma[4];
+int array_hora_alarma[4];
+int array_minuto_alarma[4];
 
-int alarmid=0;
+int alarma_id=0;
 
-int delayAsincronoMinuto[] = {0,0,0,0};
-int delayAsincronoHora[] = {0,0,0,0};
+int array_RGB[3];
+const int array_addres_RGB[] = {0,1,2};
+const int numero_elementos_RGB = 3;
+
+int delay_asincrono_minuto[] = {0,0,0,0};
+int delay_asincrono_hora[] = {0,0,0,0};
 
 union main
 {
-  char charByte[4];
-  long valLong;
+  char char_byte[4];
+  long val_long;
 }value;
 
 
@@ -71,38 +75,39 @@ void setup() {
   //RTC.adjust(DateTime(__DATE__, __TIME__));
 
   pinMode(LED_BUILTIN, OUTPUT); 
-  pinMode(ledRojo,OUTPUT);
-  pinMode(ledVerde,OUTPUT);
-  pinMode(ledAzul,OUTPUT);
+  pinMode(led_rojo,OUTPUT);
+  pinMode(led_verde,OUTPUT);
+  pinMode(led_azul,OUTPUT);
 
-  red_value = int(readEEPROM(disk1, address_red));
-  green_value = int(readEEPROM(disk1, address_green));
-  blue_value = int(readEEPROM(disk1, address_blue));
-
-  //for( int i=0; i<NumeroElementosAlarma; i++){
-  //  writeEEPROM(disk1, ArrayAddresHora[i], ArrayHoraAlarma[i]);
-  //  writeEEPROM(disk1, ArrayAddresMinuto[i], ArrayMinutosAlarma[i]);
-  //}
-
-  for( int i=0; i<NumeroElementosAlarma; i++){
-    ArrayHoraAlarma[i] = readEEPROM(disk1, ArrayAddresHora[i]);
-    ArrayMinutosAlarma[i]= readEEPROM(disk1, ArrayAddresMinuto[i]);
+ for( int i=0; i<numero_elementos_RGB; i++){
+    array_RGB[i] = readEEPROM(disk1, array_addres_RGB[i]);
+    //Serial.println(ArrayRGB[i]);
   }
 
-  analogWrite(ledRojo,red_value); 
-  analogWrite(ledVerde,green_value); 
-  analogWrite(ledAzul,blue_value); 
+  for( int i=0; i<numero_elementos_alarma; i++){
+    array_hora_alarma[i] = readEEPROM(disk1, array_address_hora[i]);
+    array_minuto_alarma[i]= readEEPROM(disk1, array_addres_minuto[i]);
+  }
+
+  analogWrite(led_rojo,array_RGB[0]); 
+  analogWrite(led_verde,array_RGB[1]); 
+  analogWrite(led_azul,array_RGB[2]); 
   digitalWrite(LED_BUILTIN, LOW);
 
   //writeEEPROM(disk1, address_red, 123);
   //writeEEPROM(disk1, address_green, 0);
   //writeEEPROM(disk1, address_blue, 0);
   Serial.print("Configurandose....");
-  while ((unsigned long) (millis() - TiempoAhora) > periodo){
+  while ((unsigned long) (millis() - tiempo_ahora) > periodo){
         Serial.print(".");
-        TiempoAhora = millis();
+        tiempo_ahora = millis();
       }
   Serial.println(".");
+
+  //for( int i=0; i<NumeroElementosAlarma; i++){
+  //  writeEEPROM(disk1, ArrayAddresHora[i], ArrayHoraAlarma[i]);
+  //  writeEEPROM(disk1, ArrayAddresMinuto[i], ArrayMinutosAlarma[i]);
+  //}
 }
 
 void loop() {
@@ -111,39 +116,24 @@ void loop() {
 
 DateTime now = RTC.now();
 
-if(lastMin!=now.minute()){
+if(last_second!=now.second()){
+    if(last_min != now.minute()){
+      Serial.print(now.hour());
+      Serial.print(':');
+      Serial.println(now.minute());
+      last_min=now.minute();
+    }    
     
-    lastMin=now.minute();
-    Serial.print(now.hour());
-    Serial.print(':');
-    Serial.println(now.minute());
-
-  for (int j = 0; j<NumeroElementosAlarma; j++){
-    if((now.hour()==delayAsincronoHora[j]) & (now.minute()==delayAsincronoMinuto[j])) {
-      if((unsigned long) (millis() - TiempoAhora) > 500){
-        Serial.println("Fin de Alarma");
-        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-        Serial.println(j);
-        TiempoAhora = millis();
-      }
-      
-    }
+  if(!flag_once & flag_auto){
+    flag_once = apagadoAlarma(now, array_hora_alarma, array_minuto_alarma, delay_asincrono_hora, delay_asincrono_minuto, flag_once);
   }
 
-  for (int i = 0; i<NumeroElementosAlarma; i++){
-    if((now.hour()==ArrayHoraAlarma[i]) & (now.minute()==ArrayMinutosAlarma[i])) {
-      if((unsigned long) (millis() - TiempoAhora) > periodo){
-        Serial.println("Alarma");
-        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-        Serial.println(i);
-        TiempoAhora = millis();
-      }
-      
-    }
+  if(flag_once & flag_auto){
+    flag_once = prendidoAlarma(now, array_hora_alarma, array_minuto_alarma, flag_once);
   }
-
   
-
+  
+  last_second=now.second();
 }
 
 if(SerialNextion.available()>0)                  //If we receive something...
@@ -151,28 +141,37 @@ if(SerialNextion.available()>0)                  //If we receive something...
   dfd += char(SerialNextion.read());
   Serial.println(dfd);
   Serial.println(dfd.length());
+  
+  if((dfd.substring(0,5)=="index")&(dfd.length()==9)){
+    value.char_byte[0]= char(dfd[5]);
+    auto_state = value.val_long;
+    if(auto_state==1){ Serial.println("Automatico"); flag_auto =true; }
+    if(auto_state==2){ Serial.println("Manual"); flag_auto = false;}
+
+    dfd = "";
+  }
 
   if((dfd.substring(0,5)=="alarm")& (dfd.length()==9)){
-    value.charByte[0]=char(dfd[5]);
-     alarmid = value.valLong;
+    value.char_byte[0]=char(dfd[5]);
+     alarma_id = value.val_long;
 
-    switch (alarmid)
+    switch (alarma_id)
     {
     case 0:
       Serial.println("Alarma1");
-      alarmNumber = 1;
+      alarm_number = 1;
       break;
     case 1:
       Serial.println("Alaram2");
-      alarmNumber =2;
+      alarm_number =2;
       break;
     case 2:
       Serial.println("Alarma3");
-      alarmNumber =3;
+      alarm_number =3;
       break;
     case 3:
       Serial.println("Alarma4");
-      alarmNumber=4;
+      alarm_number=4;
     default:
       break;
     }
@@ -182,46 +181,36 @@ if(SerialNextion.available()>0)                  //If we receive something...
   
     if((dfd.substring(0,4)=="time") & (dfd.length()==9)){
     
-    switch (alarmNumber)
+    switch (alarm_number)
     {
     case 1:
-      value.charByte[0]= char(dfd[5]);
+      value.char_byte[0]= char(dfd[5]);
 
-      if(dfd.substring(4,5)=="1")  ArrayHoraAlarma[0]= value.valLong;
-      if(dfd.substring(4,5)=="2")  ArrayMinutosAlarma[0]= value.valLong;
-
-      delayAsincronoMinuto[0] = ArrayMinutosAlarma[0] +1 ;
-      delayAsincronoHora[0] = ArrayHoraAlarma[0];
+      if(dfd.substring(4,5)=="1")  array_hora_alarma[0]= value.val_long;
+      if(dfd.substring(4,5)=="2")  array_minuto_alarma[0]= value.val_long;
       Serial.println("Alarma1Set");
       break;
     case 2:
-      value.charByte[0]= char(dfd[5]);
+      value.char_byte[0]= char(dfd[5]);
 
-      if(dfd.substring(4,5)=="1")  ArrayHoraAlarma[1]= value.valLong;
-      if(dfd.substring(4,5)=="2")  ArrayMinutosAlarma[1]= value.valLong;
+      if(dfd.substring(4,5)=="1")  array_hora_alarma[1]= value.val_long;
+      if(dfd.substring(4,5)=="2")  array_minuto_alarma[1]= value.val_long;
 
-      delayAsincronoMinuto[1] = ArrayMinutosAlarma[1] +1 ;
-      delayAsincronoHora[1] = ArrayHoraAlarma[1];
       Serial.println("Alarma2Set");
       break;
     case 3:
-      value.charByte[0]= char(dfd[5]);
+      value.char_byte[0]= char(dfd[5]);
 
-      if(dfd.substring(4,5)=="1")  ArrayHoraAlarma[2]= value.valLong;
-      if(dfd.substring(4,5)=="2")  ArrayMinutosAlarma[2]= value.valLong;
-
-      delayAsincronoMinuto[2] = ArrayMinutosAlarma[2] +1 ;
-      delayAsincronoHora[2] = ArrayHoraAlarma[2];
+      if(dfd.substring(4,5)=="1")  array_hora_alarma[2]= value.val_long;
+      if(dfd.substring(4,5)=="2")  array_minuto_alarma[2]= value.val_long;
       Serial.println("Alarma3Set");
       break;
     case 4:
-      value.charByte[0]= char(dfd[5]);
+      value.char_byte[0]= char(dfd[5]);
 
-      if(dfd.substring(4,5)=="1")  ArrayHoraAlarma[3]= value.valLong;
-      if(dfd.substring(4,5)=="2")  ArrayMinutosAlarma[3]= value.valLong;
+      if(dfd.substring(4,5)=="1")  array_hora_alarma[3]= value.val_long;
+      if(dfd.substring(4,5)=="2")  array_minuto_alarma[3]= value.val_long;
 
-      delayAsincronoMinuto[3] = ArrayMinutosAlarma[3] +1 ;
-      delayAsincronoHora[3] = ArrayHoraAlarma[3];
       Serial.println("Alarma4Set");
       break;
 
@@ -235,76 +224,76 @@ if(SerialNextion.available()>0)                  //If we receive something...
 
   if((dfd.substring(0,3)=="red")& (dfd.length()==7)){
 
-    value.charByte[0]= char(dfd[3]);
+    value.char_byte[0]= char(dfd[3]);
 
-    red_value = value.valLong; 
-    analogWrite(ledRojo,red_value); 
+    array_RGB[0] = value.val_long; 
+    analogWrite(led_rojo,array_RGB[0]); 
     dfd="";
   }
 
   if((dfd.substring(0,5)=="green")& (dfd.length()==9)){
 
-    value.charByte[0]= char(dfd[5]);
+    value.char_byte[0]= char(dfd[5]);
 
-    green_value = value.valLong;  
-    analogWrite(ledVerde,green_value); 
+    array_RGB[1] = value.val_long;  
+    analogWrite(led_verde,array_RGB[1]); 
 
     dfd="";
   }
 
   if((dfd.substring(0,4)=="blue")& (dfd.length()==8)){
 
-    value.charByte[0]= char(dfd[4]);
+    value.char_byte[0]= char(dfd[4]);
 
-    blue_value = value.valLong;  
-    analogWrite(ledAzul,blue_value); 
+    array_RGB[2] = value.val_long;  
+    analogWrite(led_azul,array_RGB[2]); 
 
     dfd="";
   }
 
   if((dfd.substring(0,5)=="motor")&(dfd.length()==10)){
 
-    value.charByte[0]= char(dfd[6]);
+    value.char_byte[0]= char(dfd[6]);
 
-    if(dfd.substring(4,5)=="1")  motor_state = value.valLong;
-    if(dfd.substring(4,5)=="2")  motor_state = value.valLong;
-    if(dfd.substring(4,5)=="3")  motor_state = value.valLong;
-    if(dfd.substring(4,5)=="4")  motor_state = value.valLong;
-    if(dfd.substring(4,5)=="5")  motor_state = value.valLong;
+    if(dfd.substring(4,5)=="1"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(4,5)=="2"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(4,5)=="3"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(4,5)=="4"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(4,5)=="5"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
     
-    if(motor_state==1) digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    if(motor_state==0) digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     dfd="";
   }
 
   if((dfd.substring(0,2)=="m6")&(dfd.length()==6)){
-    value.charByte[0]= char(dfd[2]);
-    motor_state6 = value.valLong;
+    value.char_byte[0]= char(dfd[2]);
+    motor_state6 = value.val_long;
     Serial.println(motor_state6);
 
     dfd="";
   }
 
+
+
   if((dfd.substring(0,6)=="tmeset")&(dfd.length()==10)) {
-      value.charByte[0]=char(dfd[6]);
-     alarmid = value.valLong;
-   switch (alarmid)
+    value.char_byte[0]=char(dfd[6]);
+    alarma_id = value.val_long;
+   switch (alarma_id)
     {
     case 0:
-      nextionCommand("n0.val", ArrayHoraAlarma[0]);
-      nextionCommand("n1.val", ArrayMinutosAlarma[0]);
+      nextionCommand("n0.val", readEEPROM(disk1, array_address_hora[0]));
+      nextionCommand("n1.val", readEEPROM(disk1, array_addres_minuto[0]));
       break;
     case 1:    
-      nextionCommand("n0.val", ArrayHoraAlarma[1]);
-      nextionCommand("n1.val", ArrayMinutosAlarma[1]);
+      nextionCommand("n0.val", readEEPROM(disk1, array_address_hora[1]));
+      nextionCommand("n1.val", readEEPROM(disk1, array_addres_minuto[1]));
       break;
     case 2:
-      nextionCommand("n0.val", ArrayHoraAlarma[2]);
-      nextionCommand("n1.val", ArrayMinutosAlarma[2]);
+      nextionCommand("n0.val", readEEPROM(disk1, array_address_hora[2]));
+      nextionCommand("n1.val", readEEPROM(disk1, array_addres_minuto[2]));
       break;
     case 3:
-      nextionCommand("n0.val", ArrayHoraAlarma[3]);
-      nextionCommand("n1.val", ArrayMinutosAlarma[3]);
+      nextionCommand("n0.val", readEEPROM(disk1, array_address_hora[3]));
+      nextionCommand("n1.val", readEEPROM(disk1, array_addres_minuto[3]));
     default:
       dfd="";
       break;
@@ -314,43 +303,54 @@ if(SerialNextion.available()>0)                  //If we receive something...
 
   if ((dfd.substring(0,3)=="set") & (dfd.length()==3))
   {
-    red_value = int(readEEPROM(disk1, address_red));
-    green_value = int(readEEPROM(disk1, address_green));
-    blue_value = int(readEEPROM(disk1, address_blue));
+    for( int i=0; i<numero_elementos_RGB; i++){
+    array_RGB[i] = int(readEEPROM(disk1, array_addres_RGB[i]));
+    Serial.println(array_RGB[i]);
+    }
+    analogWrite(led_rojo,array_RGB[0]); 
+    analogWrite(led_verde,array_RGB[1]); 
+    analogWrite(led_azul,array_RGB[2]); 
 
-    analogWrite(ledRojo,red_value); 
-    analogWrite(ledVerde,green_value); 
-    analogWrite(ledAzul,blue_value); 
-
-    nextionCommand("h0.val", red_value);
-    nextionCommand("h1.val", green_value);
-    nextionCommand("h2.val", blue_value);
+    nextionCommand("h0.val", array_RGB[0]);
+    nextionCommand("h1.val", array_RGB[1]);
+    nextionCommand("h2.val", array_RGB[2]);
     dfd="";
   }
   
   if((dfd.substring(0,4)=="save")&(dfd.length()==4)){
 
-    writeEEPROM(disk1, address_red, int(red_value));
-    writeEEPROM(disk1, address_green, int(green_value));
-    writeEEPROM(disk1, address_blue, int(blue_value));
+    for( int i=0; i<numero_elementos_RGB; i++){
+    if((array_RGB[i] == readEEPROM(disk1, array_addres_RGB[i]))){
+      Serial.println("No se modifico");
+      Serial.println(i);
+      }
+    else{
+      writeEEPROM(disk1, array_addres_RGB[i], array_RGB[i]);
+      Serial.println("Guardado");
+      }
+    }
     
     dfd="";
   }
 
   if((dfd.substring(0,6)=="tmsave")&(dfd.length()==6)){
-    for( int i=0; i<NumeroElementosAlarma; i++){
+    for( int i=0; i<numero_elementos_alarma; i++){
     
-    if((ArrayHoraAlarma[i] == readEEPROM(disk1, ArrayAddresHora[i]))& (ArrayMinutosAlarma[i]==readEEPROM(disk1, ArrayAddresMinuto[i]))){
+    if((array_hora_alarma[i] == readEEPROM(disk1, array_address_hora[i]))& (array_minuto_alarma[i]==readEEPROM(disk1, array_addres_minuto[i]))){
       Serial.println("No se modifico");
       Serial.println(i);
       }
     else{
-      writeEEPROM(disk1, ArrayAddresHora[i], ArrayHoraAlarma[i]);
-      writeEEPROM(disk1, ArrayAddresMinuto[i], ArrayMinutosAlarma[i]);  
+      delay_asincrono_hora[i] = array_hora_alarma[i];
+      delay_asincrono_minuto[i]= array_minuto_alarma[i] + tiempo_prendido_motor;
+      writeEEPROM(disk1, array_address_hora[i], array_hora_alarma[i]);
+      writeEEPROM(disk1, array_addres_minuto[i], array_minuto_alarma[i]);
+      Serial.println("Guardado");  
       }
     }
     dfd="";
   }
+  if(dfd.length()==20) dfd="";
   }
 }
 
@@ -359,7 +359,7 @@ void nextionCommand(String nextionName, long value){
   SerialNextion.print(nextionName);
   SerialNextion.print("=");
   SerialNextion.print(String(value));
-  SerialNextion.print(endChar);
+  SerialNextion.print(end_char);
 }
 
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, byte data ) 
@@ -389,3 +389,31 @@ byte readEEPROM(int deviceaddress, unsigned int eeaddress )
  return rdata;
 }
 
+bool prendidoAlarma(DateTime now, int ArrayHoraAlarma[4], int ArrayMinutosAlarma[4], bool FlagOnce){
+    for (int i = 0; i<numero_elementos_alarma; i++){
+      if((now.hour()==ArrayHoraAlarma[i]) & (now.minute()==ArrayMinutosAlarma[i])) {
+        Serial.println("Alarma");
+        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+        Serial.println(i);
+        FlagOnce = false;
+      }
+    }
+  return FlagOnce;
+}
+
+bool apagadoAlarma(DateTime now, int ArrayHoraAlarma[4], int ArrayMinutosAlarma[4], int delayAsincronoHora[4],int delayAsincronoMinuto[4],bool FlagOnce){
+  for (int j = 0; j<numero_elementos_alarma; j++){
+    if((now.hour()==delayAsincronoHora[j]) & (now.minute()==delayAsincronoMinuto[j])) {
+      Serial.println("Fin de Alarma");
+      digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+      Serial.println(j);  
+      FlagOnce=true;
+    }
+  }
+  return FlagOnce;
+}
+
+void estadoMotor(int motor_state, int pinMotor){
+    if(motor_state==1) digitalWrite(pinMotor, !digitalRead(pinMotor));
+    if(motor_state==0) digitalWrite(pinMotor, !digitalRead(pinMotor));
+}
