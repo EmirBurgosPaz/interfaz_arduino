@@ -10,4 +10,5 @@ Lista de elementos
 - JPG de los botones (V0 y V1)
 - Diagramas del sistema
 
- 
+ Historial de cambios en:
+  https://github.com/EmirBurgosPaz/Archive/tree/develop
