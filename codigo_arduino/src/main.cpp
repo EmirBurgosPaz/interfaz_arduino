@@ -251,15 +251,15 @@ if(SerialNextion.available()>0)                  //If we receive something...
     dfd="";
   }
 
+
+
   if((dfd.substring(0,5)=="motor")&(dfd.length()==10)){
 
-    value.char_byte[0]= char(dfd[6]);
-
-    if(dfd.substring(4,5)=="1"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
-    if(dfd.substring(4,5)=="2"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
-    if(dfd.substring(4,5)=="3"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
-    if(dfd.substring(4,5)=="4"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
-    if(dfd.substring(4,5)=="5"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(5,6)=="1"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(5,6)=="2"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(5,6)=="3"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(5,6)=="4"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
+    if(dfd.substring(5,6)=="5"){ motor_state = value.val_long; estadoMotor(motor_state, LED_BUILTIN); }
     
     dfd="";
   }
@@ -271,6 +271,14 @@ if(SerialNextion.available()>0)                  //If we receive something...
 
     dfd="";
   }
+
+  if ((dfd.substring(0,4)=="exit")& (dfd.length()==4))
+  {
+    int estado_apagado = 3;
+    estadoMotor(estado_apagado, LED_BUILTIN);
+    dfd="";
+  }
+  
 
 
 
@@ -416,4 +424,5 @@ bool apagadoAlarma(DateTime now, int ArrayHoraAlarma[4], int ArrayMinutosAlarma[
 void estadoMotor(int motor_state, int pinMotor){
     if(motor_state==1) digitalWrite(pinMotor, !digitalRead(pinMotor));
     if(motor_state==0) digitalWrite(pinMotor, !digitalRead(pinMotor));
+    if(motor_state==3) digitalWrite(pinMotor, LOW);
 }
